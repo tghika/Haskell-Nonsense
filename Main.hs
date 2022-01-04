@@ -1,6 +1,13 @@
 main :: IO ()
 main = do
 
+  putStr ">> 0 = "
+  printEl $ nat(0)
+  putStr ">> 1 = "
+  printEl $ nat(1)
+  putStr ">> 2 = "
+  printEl $ nat(2)
+
   myDup <- return $ dup
   -- Duplicating 0 -> (0,0)
   putStr ">> dup 0 = "
@@ -20,6 +27,16 @@ main = do
   putStr ">> 2+9 = "
   printEl $ pair(nat(2),nat(9)) -: myAdd
 
+  
+  myAdd29 <- return $ pair(id,termArr-:nat(29))-:myAdd
+  -- ((-)+29)(2) = 31
+  putStr ">> ((-)+29)(2) = "
+  printEl $ nat(2) -: myAdd29
+
+  -- ((-)+29)(9) = 38
+  putStr ">> ((-)+29)(9) = "
+  printEl $ nat(9) -: myAdd29
+
 
   myMul <- return $ (recurs(trans(prj2-:termArr-:nat(0)), trans(pair(ev,prj2)-:myAdd))***id)-:ev
   -- 9 * 2 = 18
@@ -29,6 +46,22 @@ main = do
   -- 2 * 9 = 18
   putStr ">> 2*9 = "
   printEl $ pair(nat(2),nat(9)) -: myMul
+
+  
+  mySq <- return $ dup-:myMul
+  -- 2 ^ 2 = 4
+  putStr ">> 2^2 = "
+  printEl $ nat(2) -: mySq
+
+  -- 9 ^ 2 = 81
+  putStr ">> 9^2 = "
+  printEl $ nat(9) -: mySq
+
+
+  mySumOfSq <- return $ (mySq***mySq) -: myAdd
+  -- 12^2+19^2 = 505
+  putStr ">> 12^2+19^2 = "
+  printEl $ pair(nat(12),nat(19)) -: mySumOfSq
 
 
   myFact <- return $ (recurs(pair(nat(0),nat(1)), pair(prj1-:succ', (succ'***id)-:myMul)))-:prj2
@@ -40,6 +73,14 @@ main = do
   putStr ">> 5! = "
   printEl $ nat(5) -: myFact
 
+
+  someFnc1 <- return $ coPair(id,myAdd)
+  -- coPair(id,+) $ (0;inj1)     = 0
+  putStr ">> coPair(id,+)$(0;inj1) = "
+  printEl $ (nat(0) -: inj1)              -: someFnc1
+  -- coPair(id,+) $ ((1,2);inj2) = 3 
+  putStr ">> coPair(id,+)$((1,2);inj2) = "
+  printEl $ (pair(nat(1),nat(2)) -: inj2) -: someFnc1
 
 
 --------------
@@ -135,11 +176,12 @@ trans :: (Prod c a -> b) -> (c -> Exp b a)
 trans = curry
 
 
--- 自然数対象(擬き)
+-- 自然数対象 (NNO)
 data Nat = Nat{imp::[()]}
 
 instance Show Nat where
   show (Nat i) = show (length i)
+  --show (Nat i) = "zero" ++ (foldr ((++).(const ";succ")) [] i)
 
 zero :: () -> Nat
 zero = el (Nat [])
@@ -147,11 +189,12 @@ zero = el (Nat [])
 succ' :: Nat -> Nat
 succ' (Nat i) = Nat (():i)
 
--- 整数リテラルを使って NNO の Global elements としての自然数を表現するための小細工
+-- 整数リテラルを使って NNO の Global elements としての自然数を得るための小細工
 nat :: Int -> (() -> Nat)
 nat i = zero -: (foldr (.) id (replicate i succ'))
 
--- recursion data q:1->A と f:A->A から recurs(q, f):Nat->A を構成する関数
+-- recursion data x_0:1->X と f:X->X から recurs(x_0, f):Nat->X を構成する関数
 -- (自然数対象の仲介射)
 recurs :: (() -> a, a -> a) -> (Nat -> a)
 recurs = ((flip ($) ())***id)-:((curry((id***(length.imp))-:uncurry(!!))).(uncurry.flip $ iterate))
+
