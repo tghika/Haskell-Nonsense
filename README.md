@@ -9,4 +9,4 @@
 
 ### Interactive モードでの実行結果
 
-![実行結果](result.png)
+![実行結果](result_v1.png)
