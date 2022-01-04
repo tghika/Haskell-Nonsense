@@ -4,41 +4,41 @@ main = do
   myDup <- return $ dup
   -- Duplicating 0 -> (0,0)
   putStr ">> dup 0 = "
-  printEl $ el(0) -: myDup
+  printEl $ nat(0) -: myDup
 
   -- Duplicating 1 -> (1,1)
   putStr ">> dup 1 = "
-  printEl $ el(1) -: myDup
+  printEl $ nat(1) -: myDup
 
 
-  myAdd <- return $ (recurs(curry(prj2), curry(ev -: succ))***id)-:ev
+  myAdd <- return $ (recurs(trans(prj2), trans(ev-:succ'))***id)-:ev
   -- 9 + 2 = 11
   putStr ">> 9+2 = "
-  printEl $ el(9,2) -: myAdd
+  printEl $ pair(nat(9),nat(2)) -: myAdd
 
   -- 2 + 9 = 11
   putStr ">> 2+9 = "
-  printEl $ el(2,9) -: myAdd
+  printEl $ pair(nat(2),nat(9)) -: myAdd
 
 
-  myMul <- return $ (recurs(curry(prj2-:termArr-:el(0)), curry(pair(ev,prj2)-:myAdd))***id)-:ev
+  myMul <- return $ (recurs(trans(prj2-:termArr-:nat(0)), trans(pair(ev,prj2)-:myAdd))***id)-:ev
   -- 9 * 2 = 18
   putStr ">> 9*2 = "
-  printEl $ el(9,2) -: myMul
+  printEl $ pair(nat(9),nat(2)) -: myMul
 
   -- 2 * 9 = 18
   putStr ">> 2*9 = "
-  printEl $ el(2,9) -: myMul
+  printEl $ pair(nat(2),nat(9)) -: myMul
 
 
-  myFact <- return $ (recurs(el(0,1), pair(prj1-:succ, (succ***id)-:myMul)))-:prj2
+  myFact <- return $ (recurs(pair(nat(0),nat(1)), pair(prj1-:succ', (succ'***id)-:myMul)))-:prj2
   -- 0! = 1
   putStr ">> 0! = "
-  printEl $ el(0) -: myFact
+  printEl $ nat(0) -: myFact
 
   -- 5! = 120
   putStr ">> 5! = "
-  printEl $ el(5) -: myFact
+  printEl $ nat(5) -: myFact
 
 
 
@@ -50,6 +50,7 @@ main = do
 el::a -> (() -> a)
 el = (const::a -> (() -> a))
 
+
 -- Global elements 用 ユーティリティ
 (===) :: Eq a =>  (() -> a) -> (() -> a) -> Bool
 (===) x y = (x() == y())
@@ -60,23 +61,33 @@ showEl x = (show $ x())
 printEl :: Show a => (() -> a) -> IO ()
 printEl = putStrLn . showEl
 
+
 -- Diagrammatic-order な射の合成演算
 (-:) = flip (.)
 
--- 終対象への一意的な射 !:X->1
--- (圏論的には定数関数 const は逆にこの射 ! を使って定義される)
+
+-- 終対象への一意的な射 !:X->1 (終対象の仲介射)
+-- (圏論的には定値関数 const は逆にこの射 ! を使って定義される)
+termArr :: a -> ()
 termArr = const ()
+
 
 -- 余積対象と積対象
 type Coprod a b = Either a b
 type Prod   a b = (a,b)
 
 -- 入射
+inj1 :: a -> Coprod a b
 inj1 = Left
+
+inj2 :: b -> Coprod a b
 inj2 = Right
 
 -- 射影
+prj1 :: Prod a b -> a
 prj1 = fst
+
+prj2 :: Prod a b -> b
 prj2 = snd
 
 -- 余積対象の仲介射
@@ -102,14 +113,45 @@ dup = pair(id, id)
 (***) f g =   pair(prj1 -: f, prj2 -: g)
 
 -- Twist の形式的双対
+coTw :: Coprod b a -> Coprod a b
 coTw = coPair(inj2, inj1)
 
 -- Twist
+tw :: Prod b a -> Prod a b
 tw = pair(prj2, prj1)
 
+
+-- Exponential 対象
+type Exp b a = a -> b
+
 -- 評価射
+-- (圏論的には uncurry という操作は逆にこの射 ev を使って実現される)
+ev :: Prod (Exp c b) b -> c
 ev = uncurry id
 
--- recursion data q:1->A and f:A->A から recurs(q, f) を構成する関数
--- (疑似的な自然数対象の仲介射)
-recurs = ((flip ($) ()) *** id) -: uncurry (curry ((!!).(uncurry.flip $ iterate)))
+-- 射の転置 (transpose) の構成
+-- (Exponential 対象の仲介射)
+trans :: (Prod c a -> b) -> (c -> Exp b a)
+trans = curry
+
+
+-- 自然数対象(擬き)
+data Nat = Nat{imp::[()]}
+
+instance Show Nat where
+  show (Nat i) = show (length i)
+
+zero :: () -> Nat
+zero = el (Nat [])
+
+succ' :: Nat -> Nat
+succ' (Nat i) = Nat (():i)
+
+-- 整数リテラルを使って NNO の Global elements としての自然数を表現するための小細工
+nat :: Int -> (() -> Nat)
+nat i = zero -: (foldr (.) id (replicate i succ'))
+
+-- recursion data q:1->A と f:A->A から recurs(q, f):Nat->A を構成する関数
+-- (自然数対象の仲介射)
+recurs :: (() -> a, a -> a) -> (Nat -> a)
+recurs = ((flip ($) ())***id)-:((curry((id***(length.imp))-:uncurry(!!))).(uncurry.flip $ iterate))
