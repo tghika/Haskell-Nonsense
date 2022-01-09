@@ -15,10 +15,10 @@ main = do
 
   -- Duplicating 1 -> (1,1)
   putStr ">> dup 1 = "
-  printEl $ nat(1) -: myDup
+  printEl $ pair(nameOf(myDup), nat(1)) -: ev
 
 
-  myAdd <- return $ (recurs(trans(prj2), trans(ev-:succ'))***id)-:ev
+  myAdd <- return $ (recurs(nameOf(id), trans(ev-:succ'))***id)-:ev
   -- 9 + 2 = 11
   putStr ">> 9+2 = "
   printEl $ pair(nat(9),nat(2)) -: myAdd
@@ -38,7 +38,7 @@ main = do
   printEl $ nat(9) -: myAdd29
 
 
-  myMul <- return $ (recurs(trans(prj2-:termArr-:nat(0)), trans(pair(ev,prj2)-:myAdd))***id)-:ev
+  myMul <- return $ (recurs(nameOf(termArr-:nat(0)), trans(pair(ev,prj2)-:myAdd))***id)-:ev
   -- 9 * 2 = 18
   putStr ">> 9*2 = "
   printEl $ pair(nat(9),nat(2)) -: myMul
@@ -154,11 +154,11 @@ dup = pair(id, id)
 (***) f g =   pair(prj1 -: f, prj2 -: g)
 
 -- Twist の形式的双対
-coTw :: Coprod b a -> Coprod a b
+coTw :: Coprod a b -> Coprod b a
 coTw = coPair(inj2, inj1)
 
 -- Twist
-tw :: Prod b a -> Prod a b
+tw :: Prod a b -> Prod b a
 tw = pair(prj2, prj1)
 
 
@@ -167,13 +167,17 @@ type Exp b a = a -> b
 
 -- 評価射
 -- (圏論的には uncurry という操作は逆にこの射 ev を使って実現される)
-ev :: Prod (Exp c b) b -> c
+ev :: Prod (Exp b a) a -> b
 ev = uncurry id
 
 -- 射の転置 (transpose) の構成
 -- (Exponential 対象の仲介射)
 trans :: (Prod c a -> b) -> (c -> Exp b a)
 trans = curry
+
+-- 射 h:a->b の Exponential 対象 (Exp b a) の要素への変換 
+nameOf :: (a -> b) -> (() -> Exp b a)
+nameOf h = trans(prj2-:h)
 
 
 -- 自然数対象 (NNO)
@@ -198,3 +202,18 @@ nat i = zero -: (foldr (.) id (replicate i succ'))
 recurs :: (() -> a, a -> a) -> (Nat -> a)
 recurs = ((flip ($) ())***id)-:((curry((id***(length.imp))-:uncurry(!!))).(uncurry.flip $ iterate))
 
+
+-- 2値の値を持つ型
+type Bool'= Coprod () ()
+
+true :: () -> Bool'
+true = inj1
+
+false :: () -> Bool'
+false = inj2
+
+if' :: Prod Bool' (Prod a a) -> a
+if' = (coPair(el(prj1), el(prj2))***id)-:ev
+
+-- Equality
+-- トポスであれば、Equality はモニック射である対角射の分類射を使って導入する
