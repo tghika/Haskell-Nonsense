@@ -203,7 +203,7 @@ recurs :: (() -> a, a -> a) -> (Nat -> a)
 recurs = ((flip ($) ())***id)-:((curry((id***(length.imp))-:uncurry(!!))).(uncurry.flip $ iterate))
 
 
--- 2値の値を持つ型
+-- 2の値を持つ型
 type Bool'= Coprod () ()
 
 true :: () -> Bool'
