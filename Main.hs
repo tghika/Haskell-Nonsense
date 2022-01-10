@@ -1,3 +1,5 @@
+import Data.Void
+
 main :: IO ()
 main = do
 
@@ -7,6 +9,12 @@ main = do
   printEl $ nat(1)
   putStr ">> 2 = "
   printEl $ nat(2)
+  
+  putStr ">> True && False = "
+  printEl $ pair(true,false) -: and'
+  putStr ">> True || False = "
+  printEl $ pair(true,false) -: or'
+  putStrLn "    (True:=inj1, False:=inj2)"
 
   myDup <- return $ dup
   -- Duplicating 0 -> (0,0)
@@ -81,25 +89,56 @@ main = do
   -- coPair(id,+) $ ((1,2);inj2) = 3 
   putStr ">> coPair(id,+)$((1,2);inj2) = "
   printEl $ (pair(nat(1),nat(2)) -: inj2) -: someFnc1
-
+  
+  
+  someFnc2 <- return $ pair(pair(termArr-:nat(0),id)-:eq', pair(termArr-:nat(1)-:dup,pair(termArr-:nat(0),id)))-:if'
+  -- (if [INPUT]==0 then (1,1) else (0,[INPUT]))(0) = (1,1)
+  putStr ">> (if [INPUT]==0 then (1,1) else (0,[INPUT]))(0) = "
+  printEl $ nat(0) -: someFnc2
+  -- (if [INPUT]==0 then (1,1) else (0,[INPUT]))(2) = (0,2)
+  putStr ">> (if [INPUT]==0 then (1,1) else (0,[INPUT]))(2) = "
+  printEl $ nat(2) -: someFnc2
+  
 
 --------------
 -- Nonsense --
 --------------
 
+class MyShow a where
+  myShow :: a -> String
+  
+instance MyShow () where
+  myShow _ = "*"
+  
+instance (MyShow a, MyShow b) => MyShow (Either a b) where
+  myShow x = case x of
+    Left z -> if (myShow z == "*") then "inj1" else (myShow z) ++ ";inj1"
+    Right z -> if (myShow z == "*") then "inj2" else (myShow z) ++ ";inj2"
+
+instance (MyShow a, MyShow b) => MyShow (a,b) where
+  myShow (x,y) = "(" ++ myShow x ++ "," ++ myShow y ++ ")"
+  
+instance MyShow Int where
+  myShow = show
+  
+instance MyShow Nat where
+  myShow (Nat i) = myShow (length i)
+  --myShow (Nat i) = "zero" ++ (foldr ((++).(const ";succ")) [] i)
+
+
 -- X の要素を圏論に倣って終対象から X への射(Global element)として扱うための関数
-el::a -> (() -> a)
-el = (const::a -> (() -> a))
+el::a -> (Pt -> a)
+el = (const::a -> (Pt -> a))
 
 
 -- Global elements 用 ユーティリティ
-(===) :: Eq a =>  (() -> a) -> (() -> a) -> Bool
+(===) :: Eq a =>  (Pt -> a) -> (Pt -> a) -> Bool
 (===) x y = (x() == y())
 
-showEl :: Show a => (() -> a) -> String
-showEl x = (show $ x()) 
+showEl :: MyShow a => (Pt -> a) -> String
+showEl x = (myShow $ x()) 
 
-printEl :: Show a => (() -> a) -> IO ()
+printEl :: MyShow a => (Pt -> a) -> IO ()
 printEl = putStrLn . showEl
 
 
@@ -107,13 +146,22 @@ printEl = putStrLn . showEl
 (-:) = flip (.)
 
 
+-- # 始対象と終対象
+
+type Empty = Void
+type Pt = ()
+
+-- 始対象からの一意的な射 !:∅->X (始対象の仲介射)
+initArr :: Empty -> a
+initArr = absurd
+
 -- 終対象への一意的な射 !:X->1 (終対象の仲介射)
 -- (圏論的には定値関数 const は逆にこの射 ! を使って定義される)
-termArr :: a -> ()
+termArr :: a -> Pt
 termArr = const ()
 
 
--- 余積対象と積対象
+-- # 余積対象と積対象
 type Coprod a b = Either a b
 type Prod   a b = (a,b)
 
@@ -162,7 +210,7 @@ tw :: Prod a b -> Prod b a
 tw = pair(prj2, prj1)
 
 
--- Exponential 対象
+-- # Exponential 対象
 type Exp b a = a -> b
 
 -- 評価射
@@ -176,44 +224,60 @@ trans :: (Prod c a -> b) -> (c -> Exp b a)
 trans = curry
 
 -- 射 h:a->b の Exponential 対象 (Exp b a) の要素への変換 
-nameOf :: (a -> b) -> (() -> Exp b a)
+nameOf :: (a -> b) -> (Pt -> Exp b a)
 nameOf h = trans(prj2-:h)
 
 
--- 自然数対象 (NNO)
-data Nat = Nat{imp::[()]}
+-- # 自然数対象 (NNO)
+data Nat = Nat{imp::[()]} deriving Eq
 
-instance Show Nat where
-  show (Nat i) = show (length i)
-  --show (Nat i) = "zero" ++ (foldr ((++).(const ";succ")) [] i)
-
-zero :: () -> Nat
+zero :: Pt -> Nat
 zero = el (Nat [])
 
 succ' :: Nat -> Nat
 succ' (Nat i) = Nat (():i)
 
 -- 整数リテラルを使って NNO の Global elements としての自然数を得るための小細工
-nat :: Int -> (() -> Nat)
+nat :: Int -> (Pt -> Nat)
 nat i = zero -: (foldr (.) id (replicate i succ'))
 
 -- recursion data x_0:1->X と f:X->X から recurs(x_0, f):Nat->X を構成する関数
 -- (自然数対象の仲介射)
-recurs :: (() -> a, a -> a) -> (Nat -> a)
+recurs :: (Pt -> a, a -> a) -> (Nat -> a)
 recurs = ((flip ($) ())***id)-:((curry((id***(length.imp))-:uncurry(!!))).(uncurry.flip $ iterate))
 
 
--- 2の値を持つ型
-type Bool'= Coprod () ()
+-- # 2の値を持つ型
+type Bool'= Coprod Pt Pt
 
-true :: () -> Bool'
+true :: Pt -> Bool'
 true = inj1
 
-false :: () -> Bool'
+false :: Pt -> Bool'
 false = inj2
 
 if' :: Prod Bool' (Prod a a) -> a
-if' = (coPair(el(prj1), el(prj2))***id)-:ev
+if' = (coPair(nameOf(prj1), nameOf(prj2))***id)-:ev
 
 -- Equality
 -- トポスであれば、Equality はモニック射である対角射の分類射を使って導入する
+eq' :: Eq a => Prod a a -> Bool'
+eq' (a,b) = case (a==b) of
+  True -> Left ()
+  False -> Right ()
+
+not' :: Bool' -> Bool'
+not' x = case x of
+  Left ()  -> Right ()
+  Right () -> Left ()
+
+-- And
+-- トポスであれば、And はモニック射である <true,true>:1->Ω×Ω の分類射 χ[<true,true>]:Ω×Ω->Ω を使って導入する
+and' :: Prod Bool' Bool' -> Bool'
+and' x = case x of
+  (Left (), Left ()) -> Left ()
+  _ -> Right ()
+
+-- Or
+or' :: Prod Bool' Bool' -> Bool'
+or' = (not'***not')-:and'-:not'
