@@ -9,7 +9,7 @@
 
 ### Interactive モードでの実行結果
 
-![実行結果](result_v1.png)
+![実行結果](result_v2.png)
 
 ## 補足
 
