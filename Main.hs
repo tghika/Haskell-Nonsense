@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeOperators #-}
+
 import Data.Void
 
 main :: IO ()
@@ -9,12 +11,16 @@ main = do
   printEl $ nat(1)
   putStr ">> 2 = "
   printEl $ nat(2)
-  
+  putStr ">> (The element of terminal object) = "
+  printEl $ point
+  putStr ">> True := "
+  printEl $ true
+  putStr ">> False := "
+  printEl $ false
   putStr ">> True && False = "
   printEl $ pair(true,false) -: and'
   putStr ">> True || False = "
   printEl $ pair(true,false) -: or'
-  putStrLn "    (True:=inj1, False:=inj2)"
 
   myDup <- return $ dup
   -- Duplicating 0 -> (0,0)
@@ -104,16 +110,16 @@ main = do
 -- Nonsense --
 --------------
 
-class MyShow a where
+class (MyShow a) where
   myShow :: a -> String
   
 instance MyShow () where
-  myShow _ = "*"
+  myShow = const "*"
   
 instance (MyShow a, MyShow b) => MyShow (Either a b) where
-  myShow x = case x of
-    Left z -> if (myShow z == "*") then "inj1" else (myShow z) ++ ";inj1"
-    Right z -> if (myShow z == "*") then "inj2" else (myShow z) ++ ";inj2"
+  myShow = either
+    (\z -> if (myShow z == "*") then "inj1" else (myShow z) ++ ";inj1")
+      (\z -> if (myShow z == "*") then "inj2" else (myShow z) ++ ";inj2")
 
 instance (MyShow a, MyShow b) => MyShow (a,b) where
   myShow (x,y) = "(" ++ myShow x ++ "," ++ myShow y ++ ")"
@@ -146,8 +152,8 @@ printEl = putStrLn . showEl
 (-:) = flip (.)
 
 
--- # 始対象と終対象
 
+-- # 始対象と終対象
 type Empty = Void
 type Pt = ()
 
@@ -160,31 +166,35 @@ initArr = absurd
 termArr :: a -> Pt
 termArr = const ()
 
+point :: Pt -> Pt
+point = id
+
+
 
 -- # 余積対象と積対象
-type Coprod a b = Either a b
-type Prod   a b = (a,b)
+type (+)  a b = Either a b
+type (**) a b = (a,b)
 
 -- 入射
-inj1 :: a -> Coprod a b
+inj1 :: a -> a + b
 inj1 = Left
 
-inj2 :: b -> Coprod a b
+inj2 :: b -> a + b
 inj2 = Right
 
 -- 射影
-prj1 :: Prod a b -> a
+prj1 :: a ** b -> a
 prj1 = fst
 
-prj2 :: Prod a b -> b
+prj2 :: a ** b -> b
 prj2 = snd
 
 -- 余積対象の仲介射
-coPair :: (a -> c, b -> c) -> (Coprod a b -> c)
+coPair :: (a -> c, b -> c) -> (a + b -> c)
 coPair = uncurry either
 
 -- 積対象の仲介射
-pair   :: (c -> a, c -> b) -> (c -> Prod a b)
+pair   :: (c -> a, c -> b) -> (c -> a ** b)
 pair = uncurry $ (<*>) . fmap (,)
 
 -- 畳み込み
@@ -194,38 +204,40 @@ fol = coPair(id, id)
 dup = pair(id, id)
 
 -- 射同士の余積
-(+++) :: (a1 -> b1) -> (a2 -> b2) -> (Coprod a1 a2 -> Coprod b1 b2)
+(+++) :: (a1 -> b1) -> (a2 -> b2) -> (a1 + a2 -> b1 + b2)
 (+++) f g = coPair(f -: inj1 , g -: inj2)
 
 -- 射同士の積
-(***) :: (a1 -> b1) -> (a2 -> b2) -> (Prod   a1 a2 -> Prod   b1 b2)
+(***) :: (a1 -> b1) -> (a2 -> b2) -> (a1 ** a2 -> b1 ** b2)
 (***) f g =   pair(prj1 -: f, prj2 -: g)
 
 -- Twist の形式的双対
-coTw :: Coprod a b -> Coprod b a
+coTw :: a + b -> b + a
 coTw = coPair(inj2, inj1)
 
 -- Twist
-tw :: Prod a b -> Prod b a
+tw :: a ** b -> b ** a
 tw = pair(prj2, prj1)
 
 
+
 -- # Exponential 対象
-type Exp b a = a -> b
+type (^) b a = a -> b
 
 -- 評価射
 -- (圏論的には uncurry という操作は逆にこの射 ev を使って実現される)
-ev :: Prod (Exp b a) a -> b
+ev :: (b ^ a) ** a -> b
 ev = uncurry id
 
 -- 射の転置 (transpose) の構成
 -- (Exponential 対象の仲介射)
-trans :: (Prod c a -> b) -> (c -> Exp b a)
+trans :: (c ** a -> b) -> (c -> b ^ a)
 trans = curry
 
 -- 射 h:a->b の Exponential 対象 (Exp b a) の要素への変換 
-nameOf :: (a -> b) -> (Pt -> Exp b a)
+nameOf :: (a -> b) -> (Pt -> b ^ a)
 nameOf h = trans(prj2-:h)
+
 
 
 -- # 自然数対象 (NNO)
@@ -247,8 +259,9 @@ recurs :: (Pt -> a, a -> a) -> (Nat -> a)
 recurs = ((flip ($) ())***id)-:((curry((id***(length.imp))-:uncurry(!!))).(uncurry.flip $ iterate))
 
 
+
 -- # 2の値を持つ型
-type Bool'= Coprod Pt Pt
+type Bool'= Pt + Pt
 
 true :: Pt -> Bool'
 true = inj1
@@ -256,12 +269,12 @@ true = inj1
 false :: Pt -> Bool'
 false = inj2
 
-if' :: Prod Bool' (Prod a a) -> a
+if' :: Bool' ** (a ** a) -> a
 if' = (coPair(nameOf(prj1), nameOf(prj2))***id)-:ev
 
 -- Equality
 -- トポスであれば、Equality はモニック射である対角射の分類射を使って導入する
-eq' :: Eq a => Prod a a -> Bool'
+eq' :: Eq a => a ** a -> Bool'
 eq' (a,b) = case (a==b) of
   True -> Left ()
   False -> Right ()
@@ -273,11 +286,11 @@ not' x = case x of
 
 -- And
 -- トポスであれば、And はモニック射である <true,true>:1->Ω×Ω の分類射 χ[<true,true>]:Ω×Ω->Ω を使って導入する
-and' :: Prod Bool' Bool' -> Bool'
+and' :: Bool' ** Bool' -> Bool'
 and' x = case x of
   (Left (), Left ()) -> Left ()
   _ -> Right ()
 
 -- Or
-or' :: Prod Bool' Bool' -> Bool'
+or' :: Bool' ** Bool' -> Bool'
 or' = (not'***not')-:and'-:not'
