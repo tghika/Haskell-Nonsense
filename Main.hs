@@ -11,6 +11,8 @@ main = do
   printEl $ nat(1)
   putStr ">> 2 = "
   printEl $ nat(2)
+  putStr ">> (5;inj2) :: ((Nat * Nat) + Nat) = "
+  printEl $ nat(5) -: inj2 -: ((_Nat***_Nat)+++_Nat)
   putStr ">> (The element of terminal object) = "
   printEl $ point
   putStr ">> True := "
@@ -32,7 +34,7 @@ main = do
   printEl $ pair(nameOf(myDup), nat(1)) -: ev
 
 
-  myAdd <- return $ (recurs(nameOf(id), trans(ev-:succ'))***id)-:ev
+  myAdd <- return $ (recurs(nameOf(_Nat), trans(ev-:succ'))***_Nat)-:ev
   -- 9 + 2 = 11
   putStr ">> 9+2 = "
   printEl $ pair(nat(9),nat(2)) -: myAdd
@@ -42,7 +44,7 @@ main = do
   printEl $ pair(nat(2),nat(9)) -: myAdd
 
   
-  myAdd29 <- return $ pair(id,termArr-:nat(29))-:myAdd
+  myAdd29 <- return $ pair(_Nat,termArr-:nat(29))-:myAdd
   -- ((-)+29)(2) = 31
   putStr ">> ((-)+29)(2) = "
   printEl $ nat(2) -: myAdd29
@@ -52,7 +54,7 @@ main = do
   printEl $ nat(9) -: myAdd29
 
 
-  myMul <- return $ (recurs(nameOf(termArr-:nat(0)), trans(pair(ev,prj2)-:myAdd))***id)-:ev
+  myMul <- return $ (recurs(nameOf(termArr-:nat(0)), trans(pair(ev,prj2)-:myAdd))***_Nat)-:ev
   -- 9 * 2 = 18
   putStr ">> 9*2 = "
   printEl $ pair(nat(9),nat(2)) -: myMul
@@ -78,7 +80,7 @@ main = do
   printEl $ pair(nat(12),nat(19)) -: mySumOfSq
 
 
-  myFact <- return $ (recurs(pair(nat(0),nat(1)), pair(prj1-:succ', (succ'***id)-:myMul)))-:prj2
+  myFact <- return $ (recurs(pair(nat(0),nat(1)), pair(prj1-:succ', (succ'***_Nat)-:myMul)))-:prj2
   -- 0! = 1
   putStr ">> 0! = "
   printEl $ nat(0) -: myFact
@@ -88,16 +90,16 @@ main = do
   printEl $ nat(5) -: myFact
 
 
-  someFnc1 <- return $ coPair(id,myAdd)
-  -- coPair(id,+) $ (0;inj1)     = 0
-  putStr ">> coPair(id,+)$(0;inj1) = "
+  someFnc1 <- return $ coPair(_Nat,myAdd)
+  -- coPair(Nat,+) $ (0;inj1)     = 0
+  putStr ">> coPair(Nat,+)$(0;inj1) = "
   printEl $ (nat(0) -: inj1)              -: someFnc1
-  -- coPair(id,+) $ ((1,2);inj2) = 3 
-  putStr ">> coPair(id,+)$((1,2);inj2) = "
+  -- coPair(Nat,+) $ ((1,2);inj2) = 3 
+  putStr ">> coPair(Nat,+)$((1,2);inj2) = "
   printEl $ (pair(nat(1),nat(2)) -: inj2) -: someFnc1
   
   
-  someFnc2 <- return $ pair(pair(termArr-:nat(0),id)-:eq', pair(termArr-:nat(1)-:dup,pair(termArr-:nat(0),id)))-:if'
+  someFnc2 <- return $ pair(pair(termArr-:nat(0),_Nat)-:eq', pair(termArr-:nat(1)-:dup,pair(termArr-:nat(0),_Nat)))-:if'
   -- (if [INPUT]==0 then (1,1) else (0,[INPUT]))(0) = (1,1)
   putStr ">> (if [INPUT]==0 then (1,1) else (0,[INPUT]))(0) = "
   printEl $ nat(0) -: someFnc2
@@ -130,10 +132,13 @@ instance MyShow Int where
 instance MyShow Nat where
   myShow (Nat i) = myShow (length i)
   --myShow (Nat i) = "zero" ++ (foldr ((++).(const ";succ")) [] i)
+  
+instance MyShow (a -> b) where
+  myShow = const "(AN ARROW)"
 
 
 -- X の要素を圏論に倣って終対象から X への射(Global element)として扱うための関数
-el::a -> (Pt -> a)
+el :: a -> (Pt -> a)
 el = (const::a -> (Pt -> a))
 
 
@@ -150,6 +155,12 @@ printEl = putStrLn . showEl
 
 -- Diagrammatic-order な射の合成演算
 (-:) = flip (.)
+
+dom :: (a -> b) -> (a -> a)
+dom _ = id
+
+cod :: (a -> b) -> (b -> b)
+cod _ = id
 
 
 
@@ -172,29 +183,29 @@ point = id
 
 
 -- # 余積対象と積対象
-type (+)  a b = Either a b
-type (**) a b = (a,b)
+type (+++)  a b = Either a b
+type (***) a b = (a,b)
 
 -- 入射
-inj1 :: a -> a + b
+inj1 :: a -> a +++ b
 inj1 = Left
 
-inj2 :: b -> a + b
+inj2 :: b -> a +++ b
 inj2 = Right
 
 -- 射影
-prj1 :: a ** b -> a
+prj1 :: a *** b -> a
 prj1 = fst
 
-prj2 :: a ** b -> b
+prj2 :: a *** b -> b
 prj2 = snd
 
 -- 余積対象の仲介射
-coPair :: (a -> c, b -> c) -> (a + b -> c)
+coPair :: (a -> c, b -> c) -> (a +++ b -> c)
 coPair = uncurry either
 
 -- 積対象の仲介射
-pair   :: (c -> a, c -> b) -> (c -> a ** b)
+pair   :: (c -> a, c -> b) -> (c -> a *** b)
 pair = uncurry $ (<*>) . fmap (,)
 
 -- 畳み込み
@@ -204,19 +215,19 @@ fol = coPair(id, id)
 dup = pair(id, id)
 
 -- 射同士の余積
-(+++) :: (a1 -> b1) -> (a2 -> b2) -> (a1 + a2 -> b1 + b2)
+(+++) :: (a1 -> b1) -> (a2 -> b2) -> (a1 +++ a2 -> b1 +++ b2)
 (+++) f g = coPair(f -: inj1 , g -: inj2)
 
 -- 射同士の積
-(***) :: (a1 -> b1) -> (a2 -> b2) -> (a1 ** a2 -> b1 ** b2)
+(***) :: (a1 -> b1) -> (a2 -> b2) -> (a1 *** a2 -> b1 *** b2)
 (***) f g =   pair(prj1 -: f, prj2 -: g)
 
 -- Twist の形式的双対
-coTw :: a + b -> b + a
+coTw :: a +++ b -> b +++ a
 coTw = coPair(inj2, inj1)
 
 -- Twist
-tw :: a ** b -> b ** a
+tw :: a *** b -> b *** a
 tw = pair(prj2, prj1)
 
 
@@ -226,12 +237,12 @@ type (^) b a = a -> b
 
 -- 評価射
 -- (圏論的には uncurry という操作は逆にこの射 ev を使って実現される)
-ev :: (b ^ a) ** a -> b
+ev :: (b ^ a) *** a -> b
 ev = uncurry id
 
 -- 射の転置 (transpose) の構成
 -- (Exponential 対象の仲介射)
-trans :: (c ** a -> b) -> (c -> b ^ a)
+trans :: (c *** a -> b) -> (c -> b ^ a)
 trans = curry
 
 -- 射 h:a->b の Exponential 対象 (Exp b a) の要素への変換 
@@ -242,6 +253,9 @@ nameOf h = trans(prj2-:h)
 
 -- # 自然数対象 (NNO)
 data Nat = Nat{imp::[()]} deriving Eq
+
+_Nat :: Nat -> Nat
+_Nat = id
 
 zero :: Pt -> Nat
 zero = el (Nat [])
@@ -261,7 +275,10 @@ recurs = ((flip ($) ())***id)-:((curry((id***(length.imp))-:uncurry(!!))).(uncur
 
 
 -- # 2の値を持つ型
-type Bool'= Pt + Pt
+type Bool'= Pt +++ Pt
+
+_Bool' :: Bool' -> Bool'
+_Bool' = id
 
 true :: Pt -> Bool'
 true = inj1
@@ -269,12 +286,12 @@ true = inj1
 false :: Pt -> Bool'
 false = inj2
 
-if' :: Bool' ** (a ** a) -> a
+if' :: Bool' *** (a *** a) -> a
 if' = (coPair(nameOf(prj1), nameOf(prj2))***id)-:ev
 
 -- Equality
 -- トポスであれば、Equality はモニック射である対角射の分類射を使って導入する
-eq' :: Eq a => a ** a -> Bool'
+eq' :: Eq a => a *** a -> Bool'
 eq' (a,b) = case (a==b) of
   True -> Left ()
   False -> Right ()
@@ -286,11 +303,11 @@ not' x = case x of
 
 -- And
 -- トポスであれば、And はモニック射である <true,true>:1->Ω×Ω の分類射 χ[<true,true>]:Ω×Ω->Ω を使って導入する
-and' :: Bool' ** Bool' -> Bool'
+and' :: Bool' *** Bool' -> Bool'
 and' x = case x of
   (Left (), Left ()) -> Left ()
   _ -> Right ()
 
 -- Or
-or' :: Bool' ** Bool' -> Bool'
+or' :: Bool' *** Bool' -> Bool'
 or' = (not'***not')-:and'-:not'
